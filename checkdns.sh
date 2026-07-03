@@ -52,9 +52,9 @@ dns_query() {
 }
 
 # Список резолверов (разделитель внутри строки — точка с запятой)
-RESOLVERS_UDP="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;AdGuardDNS:94.140.14.14 94.140.15.15;NextDNS:45.90.28.65 45.90.30.65"
-RESOLVERS_DOH="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;AdGuardDNS:dns.adguard-dns.com;NextDNS:dns.nextdns.io"
-RESOLVERS_DOT="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;AdGuardDNS:dns.adguard-dns.com;NextDNS:dns.nextdns.io"
+RESOLVERS_UDP="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;MSK-IX:62.76.76.62 62.76.62.76;AdGuardDNS:94.140.14.14 94.140.15.15;COMSS:212.109.195.93 83.220.169.155;NextDNS:45.90.28.65 45.90.30.65"
+RESOLVERS_DOH="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;MSK-IX:dns.msk-ix.ru dns2.msk-ix.ru;AdGuardDNS:dns.adguard-dns.com;COMSS:dns.comss.one;NextDNS:dns.nextdns.io"
+RESOLVERS_DOT="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;MSK-IX:dns.msk-ix.ru dns2.msk-ix.ru;AdGuardDNS:dns.adguard-dns.com;COMSS:dns.comss.one;NextDNS:dns.nextdns.io"
 
 run_checks() {
     title="$1"
