@@ -15,10 +15,13 @@ fi
 dns_query() {
     protocol="$1"
     resolver_name="$2"
-    resolver_hosts="$3"  # Список хостов через пробел
+    resolver_hosts="$3"
     
-    # Перебираем абсолютно все хосты для этого резолвера
+    # Цикл корректно обойдет все IP, разделенные пробелами
     for resolver_host in $resolver_hosts; do
+        # Пропускаем пустые итерации, если они возникнут
+        [ -z "$resolver_host" ] && continue
+        
         result=$(dig +${protocol} +tries=1 +time=3 @"$resolver_host" "$DOMAIN" A 2>&1)
         
         # Проверяем на сетевые ошибки подключения
@@ -48,63 +51,34 @@ dns_query() {
     done
 }
 
-# Списки серверов (основные и резервные через пробел)
-RESOLVERS_UDP="
-Cloudflare:1.1.1.1 1.0.0.1
-Google:8.8.8.8 8.8.4.4
-Quad9:9.9.9.9 149.112.112.112
-AdGuardDNS:94.140.14.14 94.140.15.15
-NextDNS:45.90.28.65 45.90.30.65"
+# Список резолверов (разделитель внутри строки — точка с запятой)
+RESOLVERS_UDP="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;AdGuardDNS:94.140.14.14 94.140.15.15;NextDNS:45.90.28.65 45.90.30.65"
+RESOLVERS_DOH="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;AdGuardDNS:dns.adguard-dns.com;NextDNS:dns.nextdns.io"
+RESOLVERS_DOT="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;AdGuardDNS:dns.adguard-dns.com;NextDNS:dns.nextdns.io"
 
-RESOLVERS_DOH="
-Cloudflare:1.1.1.1 1.0.0.1
-Google:8.8.8.8 8.8.4.4
-Quad9:9.9.9.9 149.112.112.112
-AdGuardDNS:://adguard-dns.com
-NextDNS:dns.nextdns.io"
-
-RESOLVERS_DOT="
-Cloudflare:1.1.1.1 1.0.0.1
-Google:8.8.8.8 8.8.4.4
-Quad9:9.9.9.9 149.112.112.112
-AdGuardDNS:://adguard-dns.com
-NextDNS:dns.nextdns.io"
-
-OLD_IFS="$IFS"
-
-echo "🔓 Plain DNS (UDP)"
-IFS="
-"
-for resolver in $RESOLVERS_UDP; do
-    [ -z "$resolver" ] && continue
+run_checks() {
+    title="$1"
+    proto="$2"
+    list="$3"
+    
+    echo "$title"
+    
+    # Используем безопасный разбор строки через IFS для ';'
+    OLD_IFS="$IFS"
+    IFS=";"
+    for item in $list; do
+        IFS="$OLD_IFS"
+        [ -z "$item" ] && continue
+        
+        name="${item%%:*}"
+        hosts="${item#*:}"
+        
+        dns_query "$proto" "$name" "$hosts"
+    done
     IFS="$OLD_IFS"
-    name=${resolver%%:*}
-    hosts=${resolver#*:}
-    dns_query "notcp" "$name" "$hosts"
-done
+    echo ""
+}
 
-echo ""
-echo "🔒 DNS over HTTPS (DoH)"
-IFS="
-"
-for resolver in $RESOLVERS_DOH; do
-    [ -z "$resolver" ] && continue
-    IFS="$OLD_IFS"
-    name=${resolver%%:*}
-    hosts=${resolver#*:}
-    dns_query "https" "$name" "$hosts"
-done
-
-echo ""
-echo "🔒 DNS over TLS (DoT)"
-IFS="
-"
-for resolver in $RESOLVERS_DOT; do
-    [ -z "$resolver" ] && continue
-    IFS="$OLD_IFS"
-    name=${resolver%%:*}
-    hosts=${resolver#*:}
-    dns_query "tls" "$name" "$hosts"
-done
-
-IFS="$OLD_IFS"
+run_checks "🔓 Plain DNS (UDP)" "notcp" "$RESOLVERS_UDP"
+run_checks "🔒 DNS over HTTPS (DoH)" "https" "$RESOLVERS_DOH"
+run_checks "🔒 DNS over TLS (DoT)" "tls" "$RESOLVERS_DOT"
