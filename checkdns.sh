@@ -52,9 +52,9 @@ dns_query() {
 }
 
 # Список резолверов (разделитель внутри строки — точка с запятой)
-RESOLVERS_UDP="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;AdGuardDNS:94.140.14.14 94.140.15.15;COMSS:212.109.195.93 83.220.169.155;NextDNS:45.90.28.65 45.90.30.65"
-RESOLVERS_DOH="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;AdGuardDNS:dns.adguard-dns.com;COMSS:dns.comss.one;NextDNS:dns.nextdns.io"
-RESOLVERS_DOT="Cloudflare:1.1.1.1 1.0.0.1;Google:8.8.8.8 8.8.4.4;Quad9:9.9.9.9 149.112.112.112;AdGuardDNS:dns.adguard-dns.com;COMSS:dns.comss.one;NextDNS:dns.nextdns.io"
+RESOLVERS_UDP="AliDNS(main):223.5.5.5 AliDNS(secondary):223.6.6.6 DNS.SB:185.222.222.222 Yandex:77.88.8.8 OpenDNS:208.67.222.222 MSK-IX:62.76.76.62 Cloudflare:1.1.1.1 Google(main):8.8.8.8 Google(secondary):8.8.4.4 Quad9:9.9.9.9 AdGuardDNS:94.140.14.14 NextDNS:45.90.28.65"
+RESOLVERS_DOH="IIJ.jp:public.dns.iij.jp Tencent:doh.pub AliDNS:dns.alidns.com LibreDNS:doh.libredns.gr Mullwad:dns.mullvad.net Wikimedia:wikimedia-dns.org DNS.SB:doh.dns.sb ControlD:freedns.controld.com Yandex:common.dot.dns.yandex.net OpenDNS:doh.opendns.com Cloudflare:1.1.1.1 Google(main):8.8.8.8 Google(secondary):8.8.4.4 Quad9:9.9.9.9 AdGuardDNS:dns.adguard-dns.com NextDNS:dns.nextdns.io"
+RESOLVERS_DOT="IIJ.jp:public.dns.iij.jp Tencent:doh.pub AliDNS:dns.alidns.com LibreDNS:doh.libredns.gr Mullwad:dns.mullvad.net Wikimedia:wikimedia-dns.org DNS.SB:dot.sb ControlD:p0.freedns.controld.com Yandex:common.dot.dns.yandex.net OpenDNS:dns.opendns.com Cloudflare:1.1.1.1 Google(main):8.8.8.8 Google(secondary):8.8.4.4 Quad9:9.9.9.9 AdGuardDNS:dns.adguard-dns.com NextDNS:dns.nextdns.io"
 
 run_checks() {
     title="$1"
