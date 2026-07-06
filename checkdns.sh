@@ -17,14 +17,11 @@ dns_query() {
     resolver_name="$2"
     resolver_hosts="$3"
     
-    # Цикл корректно обойдет все IP, разделенные пробелами
     for resolver_host in $resolver_hosts; do
-        # Пропускаем пустые итерации, если они возникнут
         [ -z "$resolver_host" ] && continue
         
-        result=$(dig +${protocol} +tries=1 +time=3 @"$resolver_host" "$DOMAIN" A 2>&1)
+        result=$(dig +${protocol} +tries=1 +time=5 @"$resolver_host" "$DOMAIN" A 2>&1)
         
-        # Проверяем на сетевые ошибки подключения
         if echo "$result" | grep -q "failed:\|timed out\|no servers could be reached\|connection refused\|host unreachable"; then
             echo "  ❌ $resolver_name ($resolver_host)"
             echo "$result" | grep -E "(failed:|timed out|no servers|connection|unreachable)" | sed 's/^/    /'
@@ -63,7 +60,6 @@ run_checks() {
     
     echo "$title"
     
-    # Используем безопасный разбор строки через IFS для ';'
     OLD_IFS="$IFS"
     IFS=";"
     for item in $list; do
