@@ -1,7 +1,7 @@
 #!/bin/sh
 #set -x
 
-DOMAIN="${1:-nvidia.com}"
+DOMAIN="${1:-lkfl2.nalog.ru}"
 
 if ! command -v dig >/dev/null 2>&1; then
     echo "dig is not installed. Commands to install:"
