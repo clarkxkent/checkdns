@@ -19,14 +19,18 @@ get_server_name() {
     esac
 }
 
-# Функция получения ASN для IP-адреса через DNS-шлюз Team Cymru
-get_asn() {
+# Функция определения главного домена владельца IP через Reverse DNS (PTR)
+get_ptr_domain() {
     local ip="$1"
-    # Разворачиваем IP-адрес задом наперед для DNS-запроса (например, 1.2.3.4 -> 4.3.2.1)
-    local rev_ip=$(echo "$ip" | awk -F. '{print $4"."$3"."$2"."$1}')
-    # Делаем TXT запрос и вытаскиваем номер ASN (первое число в ответе)
-    local asn_txt=$(dig +short TXT "${rev_ip}.origin.asn.cymru.int" 2>/dev/null | tr -d '"')
-    echo "$asn_txt" | awk '{print $1}'
+    [ -z "$ip" ] && return
+    # Запрашиваем PTR запись, переводим в нижний регистр и берем последнюю строчку
+    local ptr=$(dig +short -x "$ip" 2>/dev/null | tail -n1 | tr 'A-Z' 'a-z')
+    [ -z "$ptr" ] && return
+    
+    # Извлекаем базовый домен (например, lhr48s27-in-f14.1e100.net. -> 1e100.net)
+    # Отрезаем финальную точку, если она есть, и берем два последних сегмента
+    ptr=$(echo "$ptr" | sed 's/\.$//')
+    echo "$ptr" | awk -F. '{ if (NF>=2) print $(NF-1)"."$NF; else print $0 }'
 }
 
 # Список доменов для проверки
@@ -39,20 +43,15 @@ for SERVER_IP in $DNS_SERVERS; do
     SERVER_NAME=$(get_server_name "$SERVER_IP")
 
     for DOMAIN in $DOMAINS; do
-        # 1. Запрашиваем ПОЛНЫЙ ответ от проверяемого DNS (без +short)
+        # 1. Запрашиваем ПОЛНЫЙ ответ от проверяемого DNS
         DIG_OUTPUT=$(dig @$SERVER_IP $DOMAIN A +time=1 +tries=2 2>/dev/null)
         
-        # Вытаскиваем статус ответа (NXDOMAIN, NOERROR и т.д.)
         DNS_STATUS=$(echo "$DIG_OUTPUT" | grep -o 'status: [A-Z]*' | awk '{print $2}')
-        
-        # Вытаскиваем все IP-адреса из секции ANSWER
         ALL_PUBLIC=$(echo "$DIG_OUTPUT" | awk '/;; ANSWER SECTION:/ {flag=1; next} /;;/ {flag=0} flag' | grep -E 'IN[[:space:]]+A' | awk '{print $NF}')
         IP_PUBLIC=$(echo "$ALL_PUBLIC" | head -n1)
 
         # 2. Получаем эталонные IP через защищенный DoH
         ALL_TRUE=$(dig +short @8.8.8.8 +https "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
-        
-        # Резервный DoH через Яндекс (по IP)
         if [ -z "$ALL_TRUE" ]; then
             ALL_TRUE=$(dig +short @77.88.8.8 +https "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
         fi
@@ -69,7 +68,6 @@ for SERVER_IP in $DNS_SERVERS; do
         elif [ -z "$IP_TRUE" ]; then
             STATUS="⚠️  Эталон недоступен"
             IP_TRUE="ошибка"
-        # Если проверяемый DNS вернул NXDOMAIN (домен не найден), а эталон нашел IP -> это перехват!
         elif [ "$DNS_STATUS" = "NXDOMAIN" ] && [ -n "$IP_TRUE" ]; then
             IP_PUBLIC="NXDOMAIN"
             if [ "$SERVER_NAME" = "Yandex-Safe" ] || [ "$SERVER_NAME" = "Yandex-Family" ]; then
@@ -77,12 +75,10 @@ for SERVER_IP in $DNS_SERVERS; do
             else
                 STATUS="🚨 ПОДМЕНА (NXDOMAIN)"
             fi
-        # Если статус нормальный (NOERROR), но IP-адреса не вернулись
         elif [ -z "$IP_PUBLIC" ] && [ -n "$IP_TRUE" ]; then
             IP_PUBLIC="пустой ответ"
             STATUS="🚨 ПОДМЕНА (Пустой IP)"
         else
-            # Умное сравнение подсетей для выданных IP
             SUBNET_PUBLIC=$(echo "$IP_PUBLIC" | cut -d. -f1-2)
             SUBNET_TRUE=$(echo "$IP_TRUE" | cut -d. -f1-2)
             
@@ -92,7 +88,6 @@ for SERVER_IP in $DNS_SERVERS; do
             elif [ "$SUBNET_PUBLIC" = "$SUBNET_TRUE" ]; then
                 MATCH_FOUND=1
             else
-                # Проверяем, есть ли публичный IP в полном списке эталонных IP
                 for ip in $ALL_TRUE; do
                     if [ "$IP_PUBLIC" = "$ip" ]; then
                         MATCH_FOUND=1
@@ -101,16 +96,23 @@ for SERVER_IP in $DNS_SERVERS; do
                 done
             fi
 
-            # Если базовые проверки не совпали, задействуем сверку по Автономным Системам (ASN)
+            # 4. Динамическая проверка владельца инфраструктуры через Reverse DNS (PTR)
             if [ "$MATCH_FOUND" -eq 0 ]; then
-                ASN_PUBLIC=$(get_asn "$IP_PUBLIC")
-                ASN_TRUE=$(get_asn "$IP_TRUE")
+                PTR_PUBLIC=$(get_ptr_domain "$IP_PUBLIC")
+                PTR_TRUE=$(get_ptr_domain "$IP_TRUE")
                 
-                if [ -n "$ASN_PUBLIC" ] && [ "$ASN_PUBLIC" = "$ASN_TRUE" ]; then
+                # Если оба домена определились и они совпадают (например, оба google.com или 1e100.net)
+                if [ -n "$PTR_PUBLIC" ] && [ "$PTR_PUBLIC" = "$PTR_TRUE" ]; then
+                    MATCH_FOUND=1
+                # Специфичное легитимное Anycast-исключение для стыков инфраструктур Google
+                elif [ "$PTR_PUBLIC" = "1e100.net" ] && [ "$PTR_TRUE" = "google.com" ]; then
+                    MATCH_FOUND=1
+                elif [ "$PTR_PUBLIC" = "google.com" ] && [ "$PTR_TRUE" = "1e100.net" ]; then
                     MATCH_FOUND=1
                 fi
             fi
 
+            # Назначение итогового статуса
             if [ "$MATCH_FOUND" -eq 1 ]; then
                 STATUS="✅ ОК"
             else
