@@ -24,6 +24,23 @@ Yandex-Family:Pri:77.88.8.7
 Yandex-Family:Sec:77.88.8.3
 "
 
+# --- ИСПРАВЛЕННЫЙ БЛОК: Выбор режима тестирования ---
+echo "Выберите тип DNS серверов для тестирования:"
+echo "1) Только Primary (Pri)"
+echo "2) Только Secondary (Sec)"
+echo "3) Оба варианта (Все)"
+printf "Введите номер (1-3): "
+read -r CHOICE < /dev/tty
+
+case "$CHOICE" in
+    1) FILTER="Pri" ;;
+    2) FILTER="Sec" ;;
+    3) FILTER="" ;;
+    *) echo "❌ Неверный выбор. Выход."; exit 1 ;;
+esac
+echo "------------------------------------------------------------------------------------------------------"
+# ---------------------------------------------
+
 # Функция получения ASN через РАБОЧИЙ шлюз RouteViews
 get_asn() {
     local ip="$1"
@@ -42,7 +59,9 @@ EOF
 }
 
 # Список доменов для проверки
-DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org instagram.com whatsapp.com telegram.org"
+# ya.ru - как эталон который будет доступен даже с БС
+# pornhub.com - только для проверки фильтрации Яндекса
+DOMAINS="ya.ru rutracker.org instagram.com whatsapp.com telegram.org youtube.com pornhub.com"
 
 printf "%-15s | %-4s | %-15s | %-15s | %-15s | %-s\n" "DNS Server" "Type" "Domain" "DNS Reply" "True IP (DoH)" "Status"
 echo "------------------------------------------------------------------------------------------------------"
@@ -53,6 +72,12 @@ for SERVER_INFO in $DNS_SERVERS; do
     SERVER_IP=$(echo "$SERVER_INFO" | cut -d: -f3)
 
     [ -z "$SERVER_IP" ] && continue
+
+    # --- НОВЫЙ БЛОК: Фильтрация по типу ---
+    if [ -n "$FILTER" ] && [ "$SERVER_TYPE" != "$FILTER" ]; then
+        continue
+    fi
+    # --------------------------------------
 
     for DOMAIN in $DOMAINS; do
         # 1. Запрашиваем ПОЛНЫЙ ответ от проверяемого DNS
