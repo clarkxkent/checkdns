@@ -35,11 +35,11 @@ for SERVER_IP in $DNS_SERVERS; do
         IP_PUBLIC=$(echo "$ALL_PUBLIC" | head -n1)
 
         # 2. Получаем ВСЕ эталонные IP (выбираем первый для вывода в таблицу)
-        ALL_TRUE=$(dig +short @45.90.28.92 +https "$DOMAIN" A +time=2 +tries=1 2>/dev/null | grep -E '^[0-9.]+$')
+        ALL_TRUE=$(dig +short @dns.google +https "$DOMAIN" A +time=2 +tries=1 2>/dev/null | grep -E '^[0-9.]+$')
         
         # Резервный DoH через Яндекс
         if [ -z "$ALL_TRUE" ]; then
-            ALL_TRUE=$(dig +short @77.88.8.8 +https "$DOMAIN" A +time=2 +tries=1 2>/dev/null | grep -E '^[0-9.]+$')
+            ALL_TRUE=$(dig +short @common.dot.dns.yandex.net +https "$DOMAIN" A +time=2 +tries=1 2>/dev/null | grep -E '^[0-9.]+$')
         fi
         IP_TRUE=$(echo "$ALL_TRUE" | head -n1)
 
