@@ -1,38 +1,36 @@
 #!/bin/sh
 
-# Список проверяемых публичных DNS серверов
-DNS_SERVERS="8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1 9.9.9.9 149.112.112.112 94.140.14.14 94.140.15.15 45.90.28.80 76.76.2.0 223.5.5.5 77.88.8.8 77.88.8.88 77.88.8.7"
-
-get_server_name() {
-    case "$1" in
-        8.8.8.8) echo "Google" ;;
-        8.8.4.4) echo "Google" ;;
-        1.1.1.1) echo "Cloudflare" ;;
-        1.0.0.1) echo "Cloudflare" ;;
-        45.90.28.80) echo "NextDNS" ;;
-        76.76.2.0) echo "ControlD" ;;
-        223.5.5.5) echo "AliDNS" ;;
-        77.88.8.8) echo "Yandex-Basic" ;;
-        77.88.8.88) echo "Yandex-Safe" ;;
-        77.88.8.7) echo "Yandex-Family" ;;
-        9.9.9.9) echo "Quad9" ;;
-        149.112.112.112) echo "Quad9" ;;
-        94.140.14.14) echo "AdGuard" ;;
-        94.140.15.15) echo "AdGuard" ;;
-        *) echo "Unknown" ;;
-    esac
-}
+# Список проверяемых публичных DNS серверов (Имя:Тип:IP)
+DNS_SERVERS="
+Google-DNS:Pri:8.8.8.8
+Google-DNS:Sec:8.8.4.4
+Cloudflare:Pri:1.1.1.1
+Cloudflare:Sec:1.0.0.1
+NextDNS:Pri:45.90.28.80
+NextDNS:Sec:45.90.30.80
+ControlD:Pri:76.76.2.0
+ControlD:Sec:76.76.10.0
+AliDNS:Pri:223.5.5.5
+AliDNS:Sec:223.6.6.6
+Yandex-Basic:Pri:77.88.8.8
+Yandex-Basic:Sec:77.88.8.1
+Yandex-Safe:Pri:77.88.8.88
+Yandex-Safe:Sec:77.88.8.2
+Yandex-Family:Pri:77.88.8.7
+Yandex-Family:Sec:77.88.8.3
+Quad9-Secure:Pri:9.9.9.9
+Quad9-Secure:Sec:149.112.112.112
+AdGuard-Default:Pri:94.140.14.14
+AdGuard-Default:Sec:94.140.15.15
+"
 
 # Функция определения главного домена владельца IP через Reverse DNS (PTR)
 get_ptr_domain() {
     local ip="$1"
     [ -z "$ip" ] && return
-    # Запрашиваем PTR запись, переводим в нижний регистр и берем последнюю строчку
     local ptr=$(dig +short -x "$ip" 2>/dev/null | tail -n1 | tr 'A-Z' 'a-z')
     [ -z "$ptr" ] && return
     
-    # Извлекаем базовый домен (например, lhr48s27-in-f14.1e100.net. -> 1e100.net)
-    # Отрезаем финальную точку, если она есть, и берем два последних сегмента
     ptr=$(echo "$ptr" | sed 's/\.$//')
     echo "$ptr" | awk -F. '{ if (NF>=2) print $(NF-1)"."$NF; else print $0 }'
 }
@@ -40,11 +38,16 @@ get_ptr_domain() {
 # Список доменов для проверки
 DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org pornhub.com instagram.com whatsapp.com telegram.org"
 
-printf "%-15s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
-echo "-----------------------------------------------------------------------------------------------"
+printf "%-15s | %-4s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Тип" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
+echo "------------------------------------------------------------------------------------------------------"
 
-for SERVER_IP in $DNS_SERVERS; do
-    SERVER_NAME=$(get_server_name "$SERVER_IP")
+for SERVER_INFO in $DNS_SERVERS; do
+    # Разбираем строку формата Имя:Тип:IP без использования bash-массивов
+    SERVER_NAME=$(echo "$SERVER_INFO" | cut -d: -f1)
+    SERVER_TYPE=$(echo "$SERVER_INFO" | cut -d: -f2)
+    SERVER_IP=$(echo "$SERVER_INFO" | cut -d: -f3)
+
+    [ -z "$SERVER_IP" ] && continue
 
     for DOMAIN in $DOMAINS; do
         # 1. Запрашиваем ПОЛНЫЙ ответ от проверяемого DNS
@@ -105,10 +108,8 @@ for SERVER_IP in $DNS_SERVERS; do
                 PTR_PUBLIC=$(get_ptr_domain "$IP_PUBLIC")
                 PTR_TRUE=$(get_ptr_domain "$IP_TRUE")
                 
-                # Если оба домена определились и они совпадают (например, оба google.com или 1e100.net)
                 if [ -n "$PTR_PUBLIC" ] && [ "$PTR_PUBLIC" = "$PTR_TRUE" ]; then
                     MATCH_FOUND=1
-                # Специфичное легитимное Anycast-исключение для стыков инфраструктур Google
                 elif [ "$PTR_PUBLIC" = "1e100.net" ] && [ "$PTR_TRUE" = "google.com" ]; then
                     MATCH_FOUND=1
                 elif [ "$PTR_PUBLIC" = "google.com" ] && [ "$PTR_TRUE" = "1e100.net" ]; then
@@ -128,7 +129,7 @@ for SERVER_IP in $DNS_SERVERS; do
             fi
         fi
 
-        printf "%-15s | %-15s | %-15s | %-15s | %-s\n" "$SERVER_NAME" "$DOMAIN" "$IP_PUBLIC" "$IP_TRUE" "$STATUS"
+        printf "%-15s | %-4s | %-15s | %-15s | %-15s | %-s\n" "$SERVER_NAME" "$SERVER_TYPE" "$DOMAIN" "$IP_PUBLIC" "$IP_TRUE" "$STATUS"
     done
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "------------------------------------------------------------------------------------------------------"
 done
