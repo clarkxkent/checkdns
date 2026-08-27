@@ -1,107 +1,290 @@
 #!/bin/sh
 
-# Список проверяемых публичных DNS серверов
-DNS_SERVERS="8.8.8.8 1.1.1.1 9.9.9.9 45.90.28.80 76.76.2.0 223.5.5.5 94.140.14.14 77.88.8.8 77.88.8.88 77.88.8.7"
+# Проверка ответов публичных DNS-серверов относительно нескольких DoH-резолверов.
+# Совместимо с /bin/sh (ash/BusyBox).
+#
+# Важно: различие IP у CDN само по себе НЕ доказывает DNS-подмену.
+# Поэтому несовпадающие корректные ответы отмечаются как «ОТЛИЧАЕТСЯ»,
+# а не как безусловная «ПОДМЕНА».
 
-get_server_name() {
-    case "$1" in
-        8.8.8.8) echo "Google-DNS" ;;
-        1.1.1.1) echo "Cloudflare" ;;
-        45.90.28.80) echo "NextDNS" ;;
-        76.76.2.0) echo "ControlD" ;;
-        223.5.5.5) echo "AliDNS" ;;
-        77.88.8.8) echo "Yandex-Basic" ;;
-        77.88.8.88) echo "Yandex-Safe" ;;
-        77.88.8.7) echo "Yandex-Family" ;;
-        9.9.9.9) echo "Quad9-Secure" ;;
-        94.140.14.14) echo "AdGuard-Default" ;;
-        *) echo "Unknown" ;;
-    esac
+DNS_SERVERS="
+Google-DNS:Pri:8.8.8.8
+Google-DNS:Sec:8.8.4.4
+Cloudflare:Pri:1.1.1.1
+Cloudflare:Sec:1.0.0.1
+Quad9-Secure:Pri:9.9.9.9
+Quad9-Secure:Sec:149.112.112.112
+AdGuard-Default:Pri:94.140.14.14
+AdGuard-Default:Sec:94.140.15.15
+NextDNS:Pri:45.90.28.80
+NextDNS:Sec:45.90.30.80
+ControlD:Pri:76.76.2.0
+ControlD:Sec:76.76.10.0
+AliDNS:Pri:223.5.5.5
+AliDNS:Sec:223.6.6.6
+Yandex-Basic:Pri:77.88.8.8
+Yandex-Basic:Sec:77.88.8.1
+Yandex-Safe:Pri:77.88.8.88
+Yandex-Safe:Sec:77.88.8.2
+Yandex-Family:Pri:77.88.8.7
+Yandex-Family:Sec:77.88.8.3
+"
+
+DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org pornhub.com instagram.com whatsapp.com telegram.org"
+
+# Несколько независимых DoH-резолверов. Их ответы объединяются в эталонный набор,
+# чтобы уменьшить ложные срабатывания на CDN/geolocation.
+REFERENCE_DOH_SERVERS="8.8.8.8 1.1.1.1 9.9.9.9"
+
+if! command -v dig >/dev/null 2>&1; then
+ echo "Ошибка: команда 'dig' не найдена. Нужен пакет с dig (обычно bind-dig)." >&2
+ exit 1
+fi
+
+# Проверяем поддержку +https самой утилитой dig.
+DOH_SUPPORTED=0
+if dig -h 2>&1 | grep -qi 'https'; then
+ DOH_SUPPORTED=1
+fi
+
+TMP_DIR="${TMPDIR:-/tmp}/dns-check.$$"
+if! mkdir -p "$TMP_DIR"; then
+ echo "Ошибка: не удалось создать временный каталог $TMP_DIR" >&2
+ exit 1
+fi
+trap 'rm -rf "$TMP_DIR"' EXIT HUP INT TERM
+
+get_status() {
+ # Извлекает DNS RCODE из строки HEADER, например NOERROR/NXDOMAIN/SERVFAIL.
+ printf '%s\n' "$1" | awk '
+ /status:/ {
+ for (i = 1; i <= NF; i++) {
+ if ($i == "status:") {
+ s = $(i + 1)
+ gsub(/,/, "", s)
+ print s
+ exit
+ }
+ }
+ }
+ '
 }
 
-# Список доменов для проверки
-DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org instagram.com whatsapp.com telegram.org"
+get_a_records() {
+ # dig +answer: owner TTL class type rdata
+ printf '%s\n' "$1" | awk '$4 == "A" && $5 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ {print $5}' | sort -u
+}
 
-printf "%-15s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
-echo "-----------------------------------------------------------------------------------------------"
+first_ip() {
+ printf '%s\n' "$1" | awk 'NF {print; exit}'
+}
 
-for SERVER_IP in $DNS_SERVERS; do
-    SERVER_NAME=$(get_server_name "$SERVER_IP")
+count_lines() {
+ printf '%s\n' "$1" | awk 'NF {n++} END {print n+0}'
+}
 
-    for DOMAIN in $DOMAINS; do
-        # 1. Запрашиваем ПОЛНЫЙ ответ от проверяемого DNS (без +short)
-        DIG_OUTPUT=$(dig @$SERVER_IP $DOMAIN A +time=1 +tries=2 2>/dev/null)
-        
-        # Вытаскиваем статус ответа (NXDOMAIN, NOERROR и т.д.)
-        DNS_STATUS=$(echo "$DIG_OUTPUT" | grep -o 'status: [A-Z]*' | awk '{print $2}')
-        
-        # Вытаскиваем все IP-адреса из секции ANSWER
-        ALL_PUBLIC=$(echo "$DIG_OUTPUT" | awk '/;; ANSWER SECTION:/ {flag=1; next} /;;/ {flag=0} flag' | grep -E 'IN[[:space:]]+A' | awk '{print $NF}')
-        IP_PUBLIC=$(echo "$ALL_PUBLIC" | head -n1)
+format_ip_set() {
+ SET="$1"
+ FIRST=$(first_ip "$SET")
+ [ -z "$FIRST" ] && return
 
-        # 2. Получаем эталонные IP через защищенный DoH (используем IP-адреса для надежности)
-        ALL_TRUE=$(dig +short @8.8.8.8 +https "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
-        
-        # Резервный DoH через Яндекс (по IP)
-        if [ -z "$ALL_TRUE" ]; then
-            ALL_TRUE=$(dig +short @77.88.8.8 +https "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
-        fi
-        IP_TRUE=$(echo "$ALL_TRUE" | head -n1)
+ COUNT=$(count_lines "$SET")
+ if [ "$COUNT" -gt 1 ]; then
+ printf '%s(+%s)' "$FIRST" "$((COUNT - 1))"
+ else
+ printf '%s' "$FIRST"
+ fi
+}
 
-        # 3. Аналитика результатов
-        if [ -z "$DNS_STATUS" ] && [ -z "$IP_TRUE" ]; then
-            STATUS="⚠️  Ошибка сети"
-            IP_PUBLIC="нет ответа"
-            IP_TRUE="нет ответа"
-        elif [ -z "$DNS_STATUS" ]; then
-            STATUS="❌ DNS не ответил"
-            IP_PUBLIC="таймаут"
-        elif [ -z "$IP_TRUE" ]; then
-            STATUS="⚠️  Эталон недоступен"
-            IP_TRUE="ошибка"
-        # Если проверяемый DNS вернул NXDOMAIN (домен не найден), а эталон нашел IP -> это перехват!
-        elif [ "$DNS_STATUS" = "NXDOMAIN" ] && [ -n "$IP_TRUE" ]; then
-            IP_PUBLIC="NXDOMAIN"
-            if [ "$SERVER_NAME" = "Yandex-Safe" ] || [ "$SERVER_NAME" = "Yandex-Family" ]; then
-                STATUS="🛡️  Фильтрация Яндекса"
-            else
-                STATUS="🚨 ПОДМЕНА (NXDOMAIN)"
-            fi
-        # Если статус нормальный (NOERROR), но IP-адреса не вернулись
-        elif [ -z "$IP_PUBLIC" ] && [ -n "$IP_TRUE" ]; then
-            IP_PUBLIC="пустой ответ"
-            STATUS="🚨 ПОДМЕНА (Пустой IP)"
-        else
-            # Умное сравнение подсетей для выданных IP
-            SUBNET_PUBLIC=$(echo "$IP_PUBLIC" | cut -d. -f1-2)
-            SUBNET_TRUE=$(echo "$IP_TRUE" | cut -d. -f1-2)
-            
-            MATCH_FOUND=0
-            if [ "$IP_PUBLIC" = "$IP_TRUE" ]; then
-                MATCH_FOUND=1
-            elif [ "$SUBNET_PUBLIC" = "$SUBNET_TRUE" ]; then
-                MATCH_FOUND=1
-            else
-                for ip in $ALL_TRUE; do
-                    if [ "$IP_PUBLIC" = "$ip" ]; then
-                        MATCH_FOUND=1
-                        break
-                    fi
-                done
-            fi
+sets_intersect() {
+ # Возвращает 0, если два многострочных набора имеют хотя бы один общий IP.
+ SET_A="$1"
+ SET_B="$2"
 
-            if [ "$MATCH_FOUND" -eq 1 ]; then
-                STATUS="✅ ОК"
-            else
-                if [ "$SERVER_NAME" = "Yandex-Safe" ] || [ "$SERVER_NAME" = "Yandex-Family" ]; then
-                    STATUS="🛡️  Фильтрация Яндекса"
-                else
-                    STATUS="🚨 ПОДМЕНА!"
-                fi
-            fi
-        fi
+ for A in $SET_A; do
+ for B in $SET_B; do
+ [ "$A" = "$B" ] && return 0
+ done
+ done
+ return 1
+}
 
-        printf "%-15s | %-15s | %-15s | %-15s | %-s\n" "$SERVER_NAME" "$DOMAIN" "$IP_PUBLIC" "$IP_TRUE" "$STATUS"
-    done
-    echo "-----------------------------------------------------------------------------------------------"
+is_yandex_filtered() {
+ case "$1" in
+ Yandex-Safe|Yandex-Family) return 0;;
+ *) return 1;;
+ esac
+}
+
+build_reference_cache() {
+ DOMAIN="$1"
+ STATUS_FILE="$TMP_DIR/$DOMAIN.status"
+ IPS_FILE="$TMP_DIR/$DOMAIN.ips"
+
+: > "$IPS_FILE"
+
+ if [ "$DOH_SUPPORTED" -ne 1 ]; then
+ echo "UNAVAILABLE" > "$STATUS_FILE"
+ return
+ fi
+
+ ANY_RESPONSE=0
+ SEEN_NOERROR=0
+ SEEN_NXDOMAIN=0
+ FIRST_STATUS=""
+
+ for REF_SERVER in $REFERENCE_DOH_SERVERS; do
+ OUT=$(dig @"$REF_SERVER" "$DOMAIN" A +https +time=2 +tries=1 +noall +comments +answer 2>/dev/null)
+ ST=$(get_status "$OUT")
+
+ [ -z "$ST" ] && continue
+
+ ANY_RESPONSE=1
+ [ -z "$FIRST_STATUS" ] && FIRST_STATUS="$ST"
+
+ case "$ST" in
+ NOERROR)
+ SEEN_NOERROR=1
+ get_a_records "$OUT" >> "$IPS_FILE"
+;;
+ NXDOMAIN)
+ SEEN_NXDOMAIN=1
+;;
+ esac
+ done
+
+ if [ -s "$IPS_FILE" ]; then
+ sort -u "$IPS_FILE" -o "$IPS_FILE"
+ echo "NOERROR" > "$STATUS_FILE"
+ elif [ "$SEEN_NOERROR" -eq 1 ]; then
+ echo "NOERROR" > "$STATUS_FILE"
+ elif [ "$SEEN_NXDOMAIN" -eq 1 ]; then
+ echo "NXDOMAIN" > "$STATUS_FILE"
+ elif [ "$ANY_RESPONSE" -eq 1 ]; then
+ echo "${FIRST_STATUS:-UNKNOWN}" > "$STATUS_FILE"
+ else
+ echo "UNAVAILABLE" > "$STATUS_FILE"
+ fi
+}
+# Эталонные DoH-ответы не зависят от проверяемого DNS, поэтому получаем их один раз
+# на домен, а не повторяем для каждого DNS-сервера.
+for DOMAIN in $DOMAINS; do
+ build_reference_cache "$DOMAIN"
+done
+
+if [ "$DOH_SUPPORTED" -ne 1 ]; then
+ echo "Предупреждение: установленный dig не поддерживает +https; DoH-эталон недоступен." >&2
+fi
+
+printf "%-15s | %-4s | %-15s | %-18s | %-18s | %s\n" \
+ "DNS Сервер" "Тип" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
+echo "----------------------------------------------------------------------------------------------------------------"
+
+for SERVER_INFO in $DNS_SERVERS; do
+ SERVER_NAME=$(printf '%s\n' "$SERVER_INFO" | cut -d: -f1)
+ SERVER_TYPE=$(printf '%s\n' "$SERVER_INFO" | cut -d: -f2)
+ SERVER_IP=$(printf '%s\n' "$SERVER_INFO" | cut -d: -f3)
+
+ [ -z "$SERVER_IP" ] && continue
+
+ for DOMAIN in $DOMAINS; do
+ DIG_OUTPUT=$(dig @"$SERVER_IP" "$DOMAIN" A +time=1 +tries=2 +noall +comments +answer 2>/dev/null)
+ DNS_STATUS=$(get_status "$DIG_OUTPUT")
+ ALL_PUBLIC=$(get_a_records "$DIG_OUTPUT")
+
+ REF_STATUS=$(cat "$TMP_DIR/$DOMAIN.status" 2>/dev/null)
+ ALL_TRUE=$(cat "$TMP_DIR/$DOMAIN.ips" 2>/dev/null)
+
+ PUBLIC_DISPLAY=$(format_ip_set "$ALL_PUBLIC")
+ TRUE_DISPLAY=$(format_ip_set "$ALL_TRUE")
+
+ [ -z "$PUBLIC_DISPLAY" ] && PUBLIC_DISPLAY="-"
+ [ -z "$TRUE_DISPLAY" ] && TRUE_DISPLAY="-"
+
+ if [ -z "$DNS_STATUS" ]; then
+ STATUS="❌ DNS не ответил"
+ PUBLIC_DISPLAY="таймаут"
+
+ elif [ "$REF_STATUS" = "UNAVAILABLE" ] || [ -z "$REF_STATUS" ]; then
+ STATUS="⚠️ Эталон недоступен"
+
+ else
+ case "$DNS_STATUS" in
+ NOERROR)
+ if [ -z "$ALL_PUBLIC" ]; then
+ if [ "$REF_STATUS" = "NXDOMAIN" ]; then
+ STATUS="⚠️ Ответ отличается"
+ elif [ -n "$ALL_TRUE" ]; then
+ if is_yandex_filtered "$SERVER_NAME"; then
+ STATUS="🛡 Фильтрация Яндекса"
+ else
+ STATUS="⚠️ NOERROR без A"
+ fi
+ else
+ STATUS="✅ ОК (без A)"
+ fi
+ elif [ "$REF_STATUS" = "NXDOMAIN" ]; then
+ STATUS="⚠️ Ответ отличается"
+ elif [ -z "$ALL_TRUE" ]; then
+ STATUS="⚠️ Эталон без A"
+ elif sets_intersect "$ALL_PUBLIC" "$ALL_TRUE"; then
+ STATUS="✅ ОК"
+ else
+ if is_yandex_filtered "$SERVER_NAME"; then
+ STATUS="🛡 Фильтрация Яндекса"
+ else
+ # Для CDN разные IP у разных резолверов нормальны.
+ # Без дополнительного доказательства это не называем подменой.
+ STATUS="⚠️ ОТЛИЧАЕТСЯ"
+ fi
+ fi
+;;
+
+ NXDOMAIN)
+ PUBLIC_DISPLAY="NXDOMAIN"
+ if [ "$REF_STATUS" = "NXDOMAIN" ]; then
+ STATUS="✅ ОК (NXDOMAIN)"
+ elif [ -n "$ALL_TRUE" ] || [ "$REF_STATUS" = "NOERROR" ]; then
+ if is_yandex_filtered "$SERVER_NAME"; then
+ STATUS="🛡 Фильтрация Яндекса"
+ else
+ STATUS="🚨 ВОЗМОЖНАЯ ФИЛЬТРАЦИЯ (NXDOMAIN)"
+ fi
+ else
+ STATUS="⚠️ NXDOMAIN"
+ fi
+;;
+
+ SERVFAIL)
+ PUBLIC_DISPLAY="SERVFAIL"
+ STATUS="⚠️ SERVFAIL"
+;;
+
+ REFUSED)
+ PUBLIC_DISPLAY="REFUSED"
+ STATUS="⚠️ REFUSED"
+;;
+
+ FORMERR)
+ PUBLIC_DISPLAY="FORMERR"
+ STATUS="⚠️ FORMERR"
+;;
+
+ NOTIMP)
+ PUBLIC_DISPLAY="NOTIMP"
+ STATUS="⚠️ NOTIMP"
+;;
+
+ *)
+ [ -z "$PUBLIC_DISPLAY" ] && PUBLIC_DISPLAY="$DNS_STATUS"
+ STATUS="⚠️ DNS status: $DNS_STATUS"
+;;
+ esac
+ fi
+
+ printf "%-15s | %-4s | %-15s | %-18s | %-18s | %s\n" \
+ "$SERVER_NAME" "$SERVER_TYPE" "$DOMAIN" "$PUBLIC_DISPLAY" "$TRUE_DISPLAY" "$STATUS"
+ done
+
+ echo "----------------------------------------------------------------------------------------------------------------"
 done
