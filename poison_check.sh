@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Проверяемые публичные DNS-серверы
 DNS_SERVERS=(
