@@ -21,7 +21,7 @@ get_server_name() {
 }
 
 # Список доменов для проверки
-DOMAINS="vk.com youtube.com wikipedia.org yandex.ru google.com instagram.com intel.com whatsapp.com rutracker.org telegram.org"
+DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org instagram.com whatsapp.com telegram.org"
 
 printf "%-15s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Домен" "Ответ DNS" "Эталон (Порт)" "Статус"
 echo "-----------------------------------------------------------------------------------------------"
