@@ -44,7 +44,7 @@ EOF
 # Список доменов для проверки
 DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org instagram.com whatsapp.com telegram.org"
 
-printf "%-15s | %-4s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Тип" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
+printf "%-15s | %-4s | %-15s | %-15s | %-15s | %-s\n" "DNS Server" "Type" "Domain" "DNS Reply" "True IP (DoH)" "Status"
 echo "------------------------------------------------------------------------------------------------------"
 
 for SERVER_INFO in $DNS_SERVERS; do
