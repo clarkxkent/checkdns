@@ -6,6 +6,10 @@ Google-DNS:Pri:8.8.8.8
 Google-DNS:Sec:8.8.4.4
 Cloudflare:Pri:1.1.1.1
 Cloudflare:Sec:1.0.0.1
+Quad9-Secure:Pri:9.9.9.9
+Quad9-Secure:Sec:149.112.112.112
+AdGuard-Default:Pri:94.140.14.14
+AdGuard-Default:Sec:94.140.15.15
 NextDNS:Pri:45.90.28.80
 NextDNS:Sec:45.90.30.80
 ControlD:Pri:76.76.2.0
@@ -18,10 +22,6 @@ Yandex-Safe:Pri:77.88.8.88
 Yandex-Safe:Sec:77.88.8.2
 Yandex-Family:Pri:77.88.8.7
 Yandex-Family:Sec:77.88.8.3
-Quad9-Secure:Pri:9.9.9.9
-Quad9-Secure:Sec:149.112.112.112
-AdGuard-Default:Pri:94.140.14.14
-AdGuard-Default:Sec:94.140.15.15
 "
 
 # Функция определения главного домена владельца IP через Reverse DNS (PTR)
