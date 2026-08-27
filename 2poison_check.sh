@@ -12,16 +12,16 @@ ControlD:Pri:76.76.2.0
 ControlD:Sec:76.76.10.0
 AliDNS:Pri:223.5.5.5
 AliDNS:Sec:223.6.6.6
+Quad9-Secure:Pri:9.9.9.9
+Quad9-Secure:Sec:149.112.112.112
+AdGuard-Default:Pri:94.140.14.14
+AdGuard-Default:Sec:94.140.15.15
 Yandex-Basic:Pri:77.88.8.8
 Yandex-Basic:Sec:77.88.8.1
 Yandex-Safe:Pri:77.88.8.88
 Yandex-Safe:Sec:77.88.8.2
 Yandex-Family:Pri:77.88.8.7
 Yandex-Family:Sec:77.88.8.3
-Quad9-Secure:Pri:9.9.9.9
-Quad9-Secure:Sec:149.112.112.112
-AdGuard-Default:Pri:94.140.14.14
-AdGuard-Default:Sec:94.140.15.15
 "
 
 # Функция получения ASN через РАБОЧИЙ шлюз RouteViews
