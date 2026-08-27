@@ -176,7 +176,7 @@ if [ "$DOH_SUPPORTED" -ne 1 ]; then
  echo "Предупреждение: установленный dig не поддерживает +https; DoH-эталон недоступен." >&2
 fi
 
-printf "%-15s | %-4s | %-15s | %-20s | %-20s | %s\n" \
+printf "%-15s | %-4s | %-16s | %-22s | %-22s | %s\n" \
  "DNS Сервер" "Тип" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
 echo "----------------------------------------------------------------------------------------------------------------"
 
@@ -206,22 +206,22 @@ for SERVER_INFO in $DNS_SERVERS; do
  PUBLIC_DISPLAY="таймаут"
 
  elif [ "$REF_STATUS" = "UNAVAILABLE" ] || [ -z "$REF_STATUS" ]; then
- STATUS="?? Эталон недоступен"
+ STATUS="⚠️ Эталон недоступен"
 
  else
  case "$DNS_STATUS" in
  NOERROR)
  if [ -z "$ALL_PUBLIC" ]; then
  if [ "$REF_STATUS" = "NXDOMAIN" ]; then
- STATUS="?? Ответ отличается"
+ STATUS="⚠️ Ответ отличается"
  elif [ -n "$ALL_TRUE" ]; then
  if is_yandex_filtered "$SERVER_NAME"; then
- STATUS="?? Фильтрация Яндекса"
+ STATUS="🛡️ Фильтрация Яндекса"
  else
- STATUS="?? NOERROR без A"
+ STATUS="⚠️ NOERROR без A"
  fi
  else
- STATUS="? ОК (без A)"
+ STATUS="✅ ОК (без A)"
  fi
  elif [ "$REF_STATUS" = "NXDOMAIN" ]; then
  STATUS="⚠️ Ответ отличается"
