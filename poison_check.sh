@@ -1,19 +1,17 @@
 #!/bin/sh
 
 # Список проверяемых публичных DNS серверов (в формате строки для POSIX sh)
-DNS_SERVERS="8.8.8.8 1.1.1.1 77.88.8.8 77.88.8.88 77.88.8.7 9.9.9.9 208.67.222.222 94.140.14.14"
+DNS_SERVERS="8.8.8.8 1.1.1.1 77.88.8.8 9.9.9.9 208.67.222.222 94.140.14.14"
 
 # Имена серверов для красивого вывода
 get_server_name() {
     case "$1" in
-        8.8.8.8) echo "Google-DNS" ;;
+        8.8.8.8) echo "Google" ;;
         1.1.1.1) echo "Cloudflare" ;;
-        77.88.8.8) echo "Yandex-Basic" ;;
-        77.88.8.88) echo "Yandex-Safe" ;;
-        77.88.8.7) echo "Yandex-Family" ;;
-        9.9.9.9) echo "Quad9-Secure" ;;
-        208.67.222.222) echo "Cisco-OpenDNS" ;;
-        94.140.14.14) echo "AdGuard-Def" ;;
+        77.88.8.8) echo "Yandex" ;;
+        9.9.9.9) echo "Quad9" ;;
+        208.67.222.222) echo "OpenDNS" ;;
+        94.140.14.14) echo "AdGuard" ;;
         *) echo "Unknown" ;;
     esac
 }
