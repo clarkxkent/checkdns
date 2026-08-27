@@ -1,42 +1,53 @@
 #!/bin/sh
 
-# Проверяемые публичные DNS-серверы
-DNS_SERVERS=(
-    "Google:8.8.8.8"
-    "Google:8.8.4.4"
-    "Cloudflare:1.1.1.1"
-    "Cloudflare:1.0.0.1"
-    "Quad9:9.9.9.9"
-    "Quad9:149.112.112.112"
-    "OpenDNS:208.67.222.222"
-    "OpenDNS:208.67.220.220"
-    "AdGuard:94.140.14.14"
-    "AdGuard:94.140.15.15"
-    "Yandex:77.88.8.8"
-    "Yandex:77.88.8.1"
-)
+# Список проверяемых публичных DNS серверов (в формате строки для POSIX sh)
+DNS_SERVERS="8.8.8.8 1.1.1.1 77.88.8.8 77.88.8.88 77.88.8.7 9.9.9.9 208.67.222.222 94.140.14.14"
 
-# Сайты для тестирования
-DOMAINS="vk.com lkfl2.nalog.ru youtube.com github.com wikipedia.org yandex.ru google.com instagram.com intel.com whatsapp.com rutracker.org telegram.org"
+# Имена серверов для красивого вывода
+get_server_name() {
+    case "$1" in
+        8.8.8.8) echo "Google-DNS" ;;
+        1.1.1.1) echo "Cloudflare" ;;
+        77.88.8.8) echo "Yandex-Basic" ;;
+        77.88.8.88) echo "Yandex-Safe" ;;
+        77.88.8.7) echo "Yandex-Family" ;;
+        9.9.9.9) echo "Quad9-Secure" ;;
+        208.67.222.222) echo "Cisco-OpenDNS" ;;
+        94.140.14.14) echo "AdGuard-Def" ;;
+        *) echo "Unknown" ;;
+    esac
+}
 
-printf "%-18s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
+# Список популярных доменов
+DOMAINS="vk.com youtube.com wikipedia.org yandex.ru google.com instagram.com intel.com whatsapp.com rutracker.org telegram.org"
+
+# Отрисовка шапки таблицы (используем стандартный printf)
+printf "%-15s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
 echo "-----------------------------------------------------------------------------------------------"
 
-for SERVER_INFO in "${DNS_SERVERS[@]}"; do
-    SERVER_NAME="${SERVER_INFO%%:*}"
-    SERVER_IP="${SERVER_INFO##*:}"
+for SERVER_IP in $DNS_SERVERS; do
+    SERVER_NAME=$(get_server_name "$SERVER_IP")
 
     for DOMAIN in $DOMAINS; do
-        # 1. Запрос к проверяемому обычному DNS серверу
-        IP_PUBLIC=$(dig +short @"$SERVER_IP" "$DOMAIN" A 2>/dev/null | grep -E '^[0-9.]+$' | head -n1)
+        # 1. Запрос к проверяемому DNS серверу через nslookup (стандарт для OpenWrt)
+        IP_PUBLIC=$(nslookup "$DOMAIN" "$SERVER_IP" 2>/dev/null | awk '/^Address [0-9]+:/ { S=1; next } S && /^[0-9.]+$/ { print $1; exit }')
+        
+        # Если nslookup выдал пустую строку, пробуем альтернативный парсинг (зависит от версии BusyBox)
+        if [ -z "$IP_PUBLIC" ]; then
+            IP_PUBLIC=$(nslookup "$DOMAIN" "$SERVER_IP" 2>/dev/null | awk '/^Address: / { print $2; exit }')
+        fi
 
-        # 2. Получение эталона через нативный DoH в dig (сначала Яндекс, затем Google)
-        # Для dig таймаут ставим 2 секунды, чтобы скрипт не зависал
-        IP_TRUE=$(dig +short @77.88.8.8 +https "$DOMAIN" A +time=2 +tries=1 2>/dev/null | grep -E '^[0-9.]+$' | head -n1)
+        # 2. Получение эталона через DoH (используем API Google по IP для обхода блокировок SNI)
+        # Отправляем текстовый запрос через curl
+        JSON_RESP=$(curl -s --connect-timeout 2 -H "Accept: application/json" "https://8.8.8{DOMAIN}&type=A" 2>/dev/null)
+        
+        # Парсим IP без jq с помощью sed/awk (вытаскиваем значение из поля "data")
+        IP_TRUE=$(echo "$JSON_RESP" | awk -F'"data":"' '{print $2}' | awk -F'"' '{print $1}' | grep -E '^[0-9.]+$' | head -n1)
 
-        # Резервный DoH через Google (указываем напрямую сервер @8.8.8.8 с флагом +https для обхода SNI-блокировок)
+        # Резервный DoH через Cloudflare по IP, если Google заблокирован
         if [ -z "$IP_TRUE" ]; then
-            IP_TRUE=$(dig +short @8.8.8.8 +https "$DOMAIN" A +time=2 +tries=1 2>/dev/null | grep -E '^[0-9.]+$' | head -n1)
+            JSON_RESP=$(curl -s --connect-timeout 2 -H "Accept: application/dns-json" "https://1.1.1{DOMAIN}&type=A" 2>/dev/null)
+            IP_TRUE=$(echo "$JSON_RESP" | awk -F'"data":"' '{print $2}' | awk -F'"' '{print $1}' | grep -E '^[0-9.]+$' | head -n1)
         fi
 
         # 3. Аналитика результатов
@@ -56,7 +67,7 @@ for SERVER_INFO in "${DNS_SERVERS[@]}"; do
             STATUS="🚨 ПОДМЕНА!"
         fi
 
-        printf "%-10s | %-20s | %-15s | %-15s | %-s\n" "$SERVER_NAME" "$DOMAIN" "$IP_PUBLIC" "$IP_TRUE" "$STATUS"
+        printf "%-15s | %-15s | %-15s | %-15s | %-s\n" "$SERVER_NAME" "$DOMAIN" "$IP_PUBLIC" "$IP_TRUE" "$STATUS"
     done
     echo "-----------------------------------------------------------------------------------------------"
 done
