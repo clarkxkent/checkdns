@@ -176,7 +176,7 @@ if [ "$DOH_SUPPORTED" -ne 1 ]; then
  echo "Предупреждение: установленный dig не поддерживает +https; DoH-эталон недоступен." >&2
 fi
 
-printf "%-16s | %-4s | %-16s | %-24s | %-24s | %s\n" \
+printf "%-15s | %-3s | %-15s | %-22s | %-22s | %s\n" \
  "DNS Сервер" "Тип" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
 echo "----------------------------------------------------------------------------------------------------------------"
 
@@ -282,7 +282,7 @@ for SERVER_INFO in $DNS_SERVERS; do
  esac
  fi
 
- printf "%-16s | %-4s | %-16s | %-24s | %-24s | %s\n" \
+ printf "%-15s | %-3s | %-15s | %-22s | %-22s | %s\n" \
  "$SERVER_NAME" "$SERVER_TYPE" "$DOMAIN" "$PUBLIC_DISPLAY" "$TRUE_DISPLAY" "$STATUS"
  done
 
