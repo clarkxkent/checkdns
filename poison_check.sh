@@ -22,50 +22,66 @@ get_server_name() {
 # Список доменов для проверки
 DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org instagram.com whatsapp.com telegram.org"
 
-printf "%-15s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Домен" "Ответ DNS" "Эталон (Порт)" "Статус"
+printf "%-15s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
 echo "-----------------------------------------------------------------------------------------------"
 
 for SERVER_IP in $DNS_SERVERS; do
     SERVER_NAME=$(get_server_name "$SERVER_IP")
 
     for DOMAIN in $DOMAINS; do
-        # 1. Получаем ВСЕ IP от проверяемого DNS (выбираем первый для вывода в таблицу)
-        ALL_PUBLIC=$(dig +short @"$SERVER_IP" "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
+        # 1. Запрашиваем ПОЛНЫЙ ответ от проверяемого DNS (без +short)
+        DIG_OUTPUT=$(dig @$SERVER_IP $DOMAIN A +time=1 +tries=2 2>/dev/null)
+        
+        # Вытаскиваем статус ответа (NXDOMAIN, NOERROR и т.д.)
+        DNS_STATUS=$(echo "$DIG_OUTPUT" | grep -o 'status: [A-Z]*' | awk '{print $2}')
+        
+        # Вытаскиваем все IP-адреса из секции ANSWER
+        ALL_PUBLIC=$(echo "$DIG_OUTPUT" | awk '/;; ANSWER SECTION:/ {flag=1; next} /;;/ {flag=0} flag' | grep -E 'IN[[:space:]]+A' | awk '{print $NF}')
         IP_PUBLIC=$(echo "$ALL_PUBLIC" | head -n1)
 
-        # 2. Получаем ВСЕ эталонные IP (выбираем первый для вывода в таблицу)
-        ALL_TRUE=$(dig +short @dns.google +https "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
+        # 2. Получаем эталонные IP через защищенный DoH (используем IP-адреса для надежности)
+        ALL_TRUE=$(dig +short @8.8.8.8 +https "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
         
-        # Резервный DoH через Яндекс
+        # Резервный DoH через Яндекс (по IP)
         if [ -z "$ALL_TRUE" ]; then
-            ALL_TRUE=$(dig +short @common.dot.dns.yandex.net +https "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
+            ALL_TRUE=$(dig +short @77.88.8.8 +https "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
         fi
         IP_TRUE=$(echo "$ALL_TRUE" | head -n1)
 
         # 3. Аналитика результатов
-        if [ -z "$IP_PUBLIC" ] && [ -z "$IP_TRUE" ]; then
+        if [ -z "$DNS_STATUS" ] && [ -z "$IP_TRUE" ]; then
             STATUS="⚠️  Ошибка сети"
             IP_PUBLIC="нет ответа"
             IP_TRUE="нет ответа"
-        elif [ -z "$IP_PUBLIC" ]; then
+        elif [ -z "$DNS_STATUS" ]; then
             STATUS="❌ DNS не ответил"
-            IP_PUBLIC="ошибка"
+            IP_PUBLIC="таймаут"
         elif [ -z "$IP_TRUE" ]; then
             STATUS="⚠️  Эталон недоступен"
             IP_TRUE="ошибка"
+        # Если проверяемый DNS вернул NXDOMAIN (домен не найден), а эталон нашел IP -> это перехват!
+        elif [ "$DNS_STATUS" = "NXDOMAIN" ] && [ -n "$IP_TRUE" ]; then
+            IP_PUBLIC="NXDOMAIN"
+            if [ "$SERVER_NAME" = "Yandex-Safe" ] || [ "$SERVER_NAME" = "Yandex-Family" ]; then
+                STATUS="🛡️  Фильтрация Яндекса"
+            else
+                STATUS="🚨 ПОДМЕНА (NXDOMAIN)"
+            fi
+        # Если статус нормальный (NOERROR), но IP-адреса не вернулись
+        elif [ -z "$IP_PUBLIC" ] && [ -n "$IP_TRUE" ]; then
+            IP_PUBLIC="пустой ответ"
+            STATUS="🚨 ПОДМЕНА (Пустой IP)"
         else
-            # Логика умного сравнения подсетей (проверяем по первым 2 октетам, например 142.250.)
+            # Умное сравнение подсетей для выданных IP
             SUBNET_PUBLIC=$(echo "$IP_PUBLIC" | cut -d. -f1-2)
             SUBNET_TRUE=$(echo "$IP_TRUE" | cut -d. -f1-2)
             
-            # Проверяем точное совпадение, пересечение списков IP или совпадение подсети класса B
             MATCH_FOUND=0
             if [ "$IP_PUBLIC" = "$IP_TRUE" ]; then
                 MATCH_FOUND=1
             elif [ "$SUBNET_PUBLIC" = "$SUBNET_TRUE" ]; then
                 MATCH_FOUND=1
             else
-                # Проверяем, есть ли публичный IP в полном списке эталонных IP
                 for ip in $ALL_TRUE; do
                     if [ "$IP_PUBLIC" = "$ip" ]; then
                         MATCH_FOUND=1
@@ -77,7 +93,6 @@ for SERVER_IP in $DNS_SERVERS; do
             if [ "$MATCH_FOUND" -eq 1 ]; then
                 STATUS="✅ ОК"
             else
-                # Исключение для фильтрации Яндекса, если решите вернуть Safe/Family IP в список
                 if [ "$SERVER_NAME" = "Yandex-Safe" ] || [ "$SERVER_NAME" = "Yandex-Family" ]; then
                     STATUS="🛡️  Фильтрация Яндекса"
                 else
