@@ -34,7 +34,7 @@ get_ptr_domain() {
 }
 
 # Список доменов для проверки
-DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org instagram.com whatsapp.com telegram.org"
+DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org pornhub.com instagram.com whatsapp.com telegram.org"
 
 printf "%-15s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
 echo "-----------------------------------------------------------------------------------------------"
