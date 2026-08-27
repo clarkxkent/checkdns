@@ -202,21 +202,21 @@ for SERVER_INFO in $DNS_SERVERS; do
  [ -z "$TRUE_DISPLAY" ] && TRUE_DISPLAY="-"
 
  if [ -z "$DNS_STATUS" ]; then
- STATUS="⚠️ DNS не ответил"
+ STATUS="❌ DNS не ответил"
  PUBLIC_DISPLAY="таймаут"
 
  elif [ "$REF_STATUS" = "UNAVAILABLE" ] || [ -z "$REF_STATUS" ]; then
- STATUS="⚠️ Эталон недоступен"
+ STATUS="❌ Эталон недоступен"
 
  else
  case "$DNS_STATUS" in
  NOERROR)
  if [ -z "$ALL_PUBLIC" ]; then
  if [ "$REF_STATUS" = "NXDOMAIN" ]; then
- STATUS="⚠️ Ответ отличается"
+ STATUS="⚠️ ПОДСЕТЬ ОТЛИЧАЕТСЯ"
  elif [ -n "$ALL_TRUE" ]; then
  if is_yandex_filtered "$SERVER_NAME"; then
- STATUS="🛡️ Фильтрация Яндекса"
+ STATUS="🛡️ ФИЛЬТРАЦИЯ ЯНДЕКСА"
  else
  STATUS="⚠️ NOERROR без A"
  fi
@@ -231,11 +231,11 @@ for SERVER_INFO in $DNS_SERVERS; do
  STATUS="✅ ОК"
  else
  if is_yandex_filtered "$SERVER_NAME"; then
- STATUS="🛡️ Фильтрация Яндекса"
+ STATUS="🛡️ ФИЛЬТРАЦИЯ ЯНДЕКСА"
  else
  # Для CDN разные IP у разных резолверов нормальны.
  # Без дополнительного доказательства это не называем подменой.
- STATUS="🚨 ОТЛИЧАЕТСЯ"
+ STATUS="⚠️ ПОДСЕТЬ ОТЛИЧАЕТСЯ"
  fi
  fi
 ;;
@@ -243,12 +243,12 @@ for SERVER_INFO in $DNS_SERVERS; do
  NXDOMAIN)
  PUBLIC_DISPLAY="NXDOMAIN"
  if [ "$REF_STATUS" = "NXDOMAIN" ]; then
- STATUS="? ОК (NXDOMAIN)"
+ STATUS="✅ ОК (NXDOMAIN)"
  elif [ -n "$ALL_TRUE" ] || [ "$REF_STATUS" = "NOERROR" ]; then
  if is_yandex_filtered "$SERVER_NAME"; then
- STATUS="🛡️  Фильтрация Яндекса"
+ STATUS="🛡️  ФИЛЬТРАЦИЯ ЯНДЕКСА"
  else
- STATUS="⚠️ ВОЗМОЖНО ПОДМЕНА (NXDOMAIN)"
+ STATUS="🚨 ВОЗМОЖНО ПОДМЕНА (NXDOMAIN)"
  fi
  else
  STATUS="🚨 ПОДМЕНА (NXDOMAIN)"
