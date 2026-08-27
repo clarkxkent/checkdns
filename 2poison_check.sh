@@ -1,17 +1,11 @@
 #!/bin/sh
 
-#Трудился Gemini
-
 # Список проверяемых публичных DNS серверов (Имя:Тип:IP)
 DNS_SERVERS="
 Google-DNS:Pri:8.8.8.8
 Google-DNS:Sec:8.8.4.4
 Cloudflare:Pri:1.1.1.1
 Cloudflare:Sec:1.0.0.1
-Quad9-Secure:Pri:9.9.9.9
-Quad9-Secure:Sec:149.112.112.112
-AdGuard-Default:Pri:94.140.14.14
-AdGuard-Default:Sec:94.140.15.15
 NextDNS:Pri:45.90.28.80
 NextDNS:Sec:45.90.30.80
 ControlD:Pri:76.76.2.0
@@ -24,27 +18,36 @@ Yandex-Safe:Pri:77.88.8.88
 Yandex-Safe:Sec:77.88.8.2
 Yandex-Family:Pri:77.88.8.7
 Yandex-Family:Sec:77.88.8.3
+Quad9-Secure:Pri:9.9.9.9
+Quad9-Secure:Sec:149.112.112.112
+AdGuard-Default:Pri:94.140.14.14
+AdGuard-Default:Sec:94.140.15.15
 "
 
-# Функция определения главного домена владельца IP через Reverse DNS (PTR)
-get_ptr_domain() {
+# Функция получения ASN через РАБОЧИЙ шлюз RouteViews
+get_asn() {
     local ip="$1"
     [ -z "$ip" ] && return
-    local ptr=$(dig +short -x "$ip" 2>/dev/null | tail -n1 | tr 'A-Z' 'a-z')
-    [ -z "$ptr" ] && return
     
-    ptr=$(echo "$ptr" | sed 's/\.$//')
-    echo "$ptr" | awk -F. '{ if (NF>=2) print $(NF-1)"."$NF; else print $0 }'
+    # Разворачиваем IP (POSIX-way без awk)
+    local o1 o2 o3 o4
+    IFS=. read -r o1 o2 o3 o4 <<EOF
+$ip
+EOF
+    local rev_ip="${o4}.${o3}.${o2}.${o1}"
+    
+    # Делаем запрос к RouteViews, убираем кавычки и берем первое значение (номер ASN)
+    local asn_txt=$(dig +short TXT "${rev_ip}.asn.routeviews.org" 2>/dev/null | tr -d '"')
+    echo "$asn_txt" | awk '{print $1}'
 }
 
 # Список доменов для проверки
-DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org pornhub.com instagram.com whatsapp.com telegram.org"
+DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org instagram.com whatsapp.com telegram.org"
 
 printf "%-15s | %-4s | %-15s | %-15s | %-15s | %-s\n" "DNS Сервер" "Тип" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
 echo "------------------------------------------------------------------------------------------------------"
 
 for SERVER_INFO in $DNS_SERVERS; do
-    # Разбираем строку формата Имя:Тип:IP без использования bash-массивов
     SERVER_NAME=$(echo "$SERVER_INFO" | cut -d: -f1)
     SERVER_TYPE=$(echo "$SERVER_INFO" | cut -d: -f2)
     SERVER_IP=$(echo "$SERVER_INFO" | cut -d: -f3)
@@ -105,16 +108,12 @@ for SERVER_INFO in $DNS_SERVERS; do
                 done
             fi
 
-            # 4. Динамическая проверка владельца инфраструктуры через Reverse DNS (PTR)
+            # 4. Если базовые проверки не совпали — динамически сверяем ASN через RouteViews
             if [ "$MATCH_FOUND" -eq 0 ]; then
-                PTR_PUBLIC=$(get_ptr_domain "$IP_PUBLIC")
-                PTR_TRUE=$(get_ptr_domain "$IP_TRUE")
+                ASN_PUBLIC=$(get_asn "$IP_PUBLIC")
+                ASN_TRUE=$(get_asn "$IP_TRUE")
                 
-                if [ -n "$PTR_PUBLIC" ] && [ "$PTR_PUBLIC" = "$PTR_TRUE" ]; then
-                    MATCH_FOUND=1
-                elif [ "$PTR_PUBLIC" = "1e100.net" ] && [ "$PTR_TRUE" = "google.com" ]; then
-                    MATCH_FOUND=1
-                elif [ "$PTR_PUBLIC" = "google.com" ] && [ "$PTR_TRUE" = "1e100.net" ]; then
+                if [ -n "$ASN_PUBLIC" ] && [ "$ASN_PUBLIC" = "$ASN_TRUE" ]; then
                     MATCH_FOUND=1
                 fi
             fi
