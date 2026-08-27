@@ -246,12 +246,12 @@ for SERVER_INFO in $DNS_SERVERS; do
  STATUS="? ОК (NXDOMAIN)"
  elif [ -n "$ALL_TRUE" ] || [ "$REF_STATUS" = "NOERROR" ]; then
  if is_yandex_filtered "$SERVER_NAME"; then
- STATUS="?? Фильтрация Яндекса"
+ STATUS="🛡️  Фильтрация Яндекса"
  else
- STATUS="?? ВОЗМОЖНАЯ ФИЛЬТРАЦИЯ (NXDOMAIN)"
+ STATUS="⚠️ ВОЗМОЖНО ПОДМЕНА (NXDOMAIN)"
  fi
  else
- STATUS="?? NXDOMAIN"
+ STATUS="🚨 ПОДМЕНА (NXDOMAIN)"
  fi
 ;;
 
