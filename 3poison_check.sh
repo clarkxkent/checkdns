@@ -59,7 +59,9 @@ EOF
 }
 
 # Список доменов для проверки
-DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org instagram.com whatsapp.com telegram.org"
+# ya.ru - как эталон который будет доступен даже с БС
+# pornhub.com - только для проверки фильтрации Яндекса
+DOMAINS="ya.ru rutracker.org instagram.com whatsapp.com telegram.org pornhub.com"
 
 printf "%-15s | %-4s | %-15s | %-15s | %-15s | %-s\n" "DNS Server" "Type" "Domain" "DNS Reply" "True IP (DoH)" "Status"
 echo "------------------------------------------------------------------------------------------------------"
