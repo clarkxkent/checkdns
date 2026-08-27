@@ -176,7 +176,7 @@ if [ "$DOH_SUPPORTED" -ne 1 ]; then
  echo "Предупреждение: установленный dig не поддерживает +https; DoH-эталон недоступен." >&2
 fi
 
-printf "%-15s | %-4s | %-16s | %-22s | %-22s | %s\n" \
+printf "%-16s | %-4s | %-16s | %-22s | %-22s | %s\n" \
  "DNS Сервер" "Тип" "Домен" "Ответ DNS" "Эталон (DoH)" "Статус"
 echo "----------------------------------------------------------------------------------------------------------------"
 
@@ -202,7 +202,7 @@ for SERVER_INFO in $DNS_SERVERS; do
  [ -z "$TRUE_DISPLAY" ] && TRUE_DISPLAY="-"
 
  if [ -z "$DNS_STATUS" ]; then
- STATUS="? DNS не ответил"
+ STATUS="⚠️ DNS не ответил"
  PUBLIC_DISPLAY="таймаут"
 
  elif [ "$REF_STATUS" = "UNAVAILABLE" ] || [ -z "$REF_STATUS" ]; then
@@ -235,7 +235,7 @@ for SERVER_INFO in $DNS_SERVERS; do
  else
  # Для CDN разные IP у разных резолверов нормальны.
  # Без дополнительного доказательства это не называем подменой.
- STATUS="⚠️ ОТЛИЧАЕТСЯ"
+ STATUS="🚨 ОТЛИЧАЕТСЯ"
  fi
  fi
 ;;
@@ -257,22 +257,22 @@ for SERVER_INFO in $DNS_SERVERS; do
 
  SERVFAIL)
  PUBLIC_DISPLAY="SERVFAIL"
- STATUS="?? SERVFAIL"
+ STATUS="❌ SERVFAIL"
 ;;
 
  REFUSED)
  PUBLIC_DISPLAY="REFUSED"
- STATUS="?? REFUSED"
+ STATUS="❌ REFUSED"
 ;;
 
  FORMERR)
  PUBLIC_DISPLAY="FORMERR"
- STATUS="?? FORMERR"
+ STATUS="❌ FORMERR"
 ;;
 
  NOTIMP)
  PUBLIC_DISPLAY="NOTIMP"
- STATUS="?? NOTIMP"
+ STATUS="❌ NOTIMP"
 ;;
 
  *)
@@ -282,7 +282,7 @@ for SERVER_INFO in $DNS_SERVERS; do
  esac
  fi
 
- printf "%-15s | %-4s | %-15s | %-18s | %-18s | %s\n" \
+ printf "%-16s | %-4s | %-16s | %-22s | %-22s | %s\n" \
  "$SERVER_NAME" "$SERVER_TYPE" "$DOMAIN" "$PUBLIC_DISPLAY" "$TRUE_DISPLAY" "$STATUS"
  done
 
