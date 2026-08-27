@@ -72,14 +72,14 @@ for SERVER_INFO in $DNS_SERVERS; do
         # 3. Аналитика результатов
         if [ -z "$DNS_STATUS" ] && [ -z "$IP_TRUE" ]; then
             STATUS="⚠️  Ошибка сети"
-            IP_PUBLIC="нет ответа"
-            IP_TRUE="нет ответа"
+            IP_PUBLIC="NORESOLVE"
+            IP_TRUE="NORESOLVE"
         elif [ -z "$DNS_STATUS" ]; then
             STATUS="❌ DNS не ответил"
-            IP_PUBLIC="таймаут"
+            IP_PUBLIC="TIMEOUT"
         elif [ -z "$IP_TRUE" ]; then
             STATUS="⚠️  Эталон недоступен"
-            IP_TRUE="ошибка"
+            IP_TRUE="ERROR"
         elif [ "$DNS_STATUS" = "NXDOMAIN" ] && [ -n "$IP_TRUE" ]; then
             IP_PUBLIC="NXDOMAIN"
             if [ "$SERVER_NAME" = "Yandex-Safe" ] || [ "$SERVER_NAME" = "Yandex-Family" ]; then
@@ -88,7 +88,7 @@ for SERVER_INFO in $DNS_SERVERS; do
                 STATUS="🚨 ПОДМЕНА (NXDOMAIN)"
             fi
         elif [ -z "$IP_PUBLIC" ] && [ -n "$IP_TRUE" ]; then
-            IP_PUBLIC="пустой ответ"
+            IP_PUBLIC="EMPTY RESPONSE"
             STATUS="🚨 ПОДМЕНА (Пустой IP)"
         else
             SUBNET_PUBLIC=$(echo "$IP_PUBLIC" | cut -d. -f1-2)
