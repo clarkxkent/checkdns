@@ -7,6 +7,9 @@ A lightweight shell script to test plain DNS, DNS over HTTPS (DoH) and DNS over 
 ```bash
 wget -qO- https://raw.githubusercontent.com/clarkxkent/checkdns/refs/heads/main/checkdns.sh | sh
 ```
+```bash
+wget -qO- https://raw.githubusercontent.com/clarkxkent/checkdns/refs/heads/main/poison_check.sh | sh
+```
 
 ### Test custom domain:
 ```bash
