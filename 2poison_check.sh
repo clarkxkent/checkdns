@@ -63,9 +63,9 @@ for SERVER_INFO in $DNS_SERVERS; do
         IP_PUBLIC=$(echo "$ALL_PUBLIC" | head -n1)
 
         # 2. Получаем эталонные IP через защищенный DoH
-        ALL_TRUE=$(dig +short @8.8.8.8 +https "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
+        ALL_TRUE=$(dig +short @8.8.8.8 +https "$DOMAIN" A +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
         if [ -z "$ALL_TRUE" ]; then
-            ALL_TRUE=$(dig +short @77.88.8.8 +https "$DOMAIN" A +time=1 +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
+            ALL_TRUE=$(dig +short @77.88.8.8 +https "$DOMAIN" A +tries=2 2>/dev/null | grep -E '^[0-9.]+$')
         fi
         IP_TRUE=$(echo "$ALL_TRUE" | head -n1)
 
