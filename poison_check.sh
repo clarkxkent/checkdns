@@ -224,18 +224,18 @@ for SERVER_INFO in $DNS_SERVERS; do
  STATUS="? ОК (без A)"
  fi
  elif [ "$REF_STATUS" = "NXDOMAIN" ]; then
- STATUS="?? Ответ отличается"
+ STATUS="⚠️ Ответ отличается"
  elif [ -z "$ALL_TRUE" ]; then
- STATUS="?? Эталон без A"
+ STATUS="⚠️ Эталон без A"
  elif sets_intersect "$ALL_PUBLIC" "$ALL_TRUE"; then
- STATUS="? ОК"
+ STATUS="✅ ОК"
  else
  if is_yandex_filtered "$SERVER_NAME"; then
- STATUS="?? Фильтрация Яндекса"
+ STATUS="🛡️ Фильтрация Яндекса"
  else
  # Для CDN разные IP у разных резолверов нормальны.
  # Без дополнительного доказательства это не называем подменой.
- STATUS="?? ОТЛИЧАЕТСЯ"
+ STATUS="⚠️ ОТЛИЧАЕТСЯ"
  fi
  fi
 ;;
