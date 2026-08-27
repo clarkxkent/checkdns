@@ -1,5 +1,7 @@
 #!/bin/sh
 
+#Трудился Gemini
+
 # Список проверяемых публичных DNS серверов (Имя:Тип:IP)
 DNS_SERVERS="
 Google-DNS:Pri:8.8.8.8
