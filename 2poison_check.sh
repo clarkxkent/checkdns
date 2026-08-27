@@ -56,7 +56,7 @@ for SERVER_INFO in $DNS_SERVERS; do
 
     for DOMAIN in $DOMAINS; do
         # 1. Запрашиваем ПОЛНЫЙ ответ от проверяемого DNS
-        DIG_OUTPUT=$(dig @$SERVER_IP $DOMAIN A +time=1 +tries=2 2>/dev/null)
+        DIG_OUTPUT=$(dig @$SERVER_IP $DOMAIN A +tries=2 2>/dev/null)
         
         DNS_STATUS=$(echo "$DIG_OUTPUT" | grep -o 'status: [A-Z]*' | awk '{print $2}')
         ALL_PUBLIC=$(echo "$DIG_OUTPUT" | awk '/;; ANSWER SECTION:/ {flag=1; next} /;;/ {flag=0} flag' | grep -E 'IN[[:space:]]+A' | awk '{print $NF}')
