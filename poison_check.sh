@@ -1,7 +1,5 @@
 #!/bin/sh
 
-#Трудился @forkop_aibot
-
 # Проверка ответов публичных DNS-серверов относительно нескольких DoH-резолверов.
 # Совместимо с /bin/sh (ash/BusyBox).
 #
@@ -38,7 +36,7 @@ DOMAINS="vkvideo.ru youtube.com discord.com rutracker.org pornhub.com instagram.
 # чтобы уменьшить ложные срабатывания на CDN/geolocation.
 REFERENCE_DOH_SERVERS="8.8.8.8 1.1.1.1 9.9.9.9"
 
-if! command -v dig >/dev/null 2>&1; then
+if ! command -v dig >/dev/null 2>&1; then
  echo "Ошибка: команда 'dig' не найдена. Нужен пакет с dig (обычно bind-dig)." >&2
  exit 1
 fi
@@ -50,7 +48,7 @@ if dig -h 2>&1 | grep -qi 'https'; then
 fi
 
 TMP_DIR="${TMPDIR:-/tmp}/dns-check.$$"
-if! mkdir -p "$TMP_DIR"; then
+if ! mkdir -p "$TMP_DIR"; then
  echo "Ошибка: не удалось создать временный каталог $TMP_DIR" >&2
  exit 1
 fi
@@ -204,40 +202,40 @@ for SERVER_INFO in $DNS_SERVERS; do
  [ -z "$TRUE_DISPLAY" ] && TRUE_DISPLAY="-"
 
  if [ -z "$DNS_STATUS" ]; then
- STATUS="❌ DNS не ответил"
+ STATUS="? DNS не ответил"
  PUBLIC_DISPLAY="таймаут"
 
  elif [ "$REF_STATUS" = "UNAVAILABLE" ] || [ -z "$REF_STATUS" ]; then
- STATUS="⚠️ Эталон недоступен"
+ STATUS="?? Эталон недоступен"
 
  else
  case "$DNS_STATUS" in
  NOERROR)
  if [ -z "$ALL_PUBLIC" ]; then
  if [ "$REF_STATUS" = "NXDOMAIN" ]; then
- STATUS="⚠️ Ответ отличается"
+ STATUS="?? Ответ отличается"
  elif [ -n "$ALL_TRUE" ]; then
  if is_yandex_filtered "$SERVER_NAME"; then
- STATUS="🛡 Фильтрация Яндекса"
+ STATUS="?? Фильтрация Яндекса"
  else
- STATUS="⚠️ NOERROR без A"
+ STATUS="?? NOERROR без A"
  fi
  else
- STATUS="✅ ОК (без A)"
+ STATUS="? ОК (без A)"
  fi
  elif [ "$REF_STATUS" = "NXDOMAIN" ]; then
- STATUS="⚠️ Ответ отличается"
+ STATUS="?? Ответ отличается"
  elif [ -z "$ALL_TRUE" ]; then
- STATUS="⚠️ Эталон без A"
+ STATUS="?? Эталон без A"
  elif sets_intersect "$ALL_PUBLIC" "$ALL_TRUE"; then
- STATUS="✅ ОК"
+ STATUS="? ОК"
  else
  if is_yandex_filtered "$SERVER_NAME"; then
- STATUS="🛡 Фильтрация Яндекса"
+ STATUS="?? Фильтрация Яндекса"
  else
  # Для CDN разные IP у разных резолверов нормальны.
  # Без дополнительного доказательства это не называем подменой.
- STATUS="⚠️ ОТЛИЧАЕТСЯ"
+ STATUS="?? ОТЛИЧАЕТСЯ"
  fi
  fi
 ;;
@@ -245,41 +243,41 @@ for SERVER_INFO in $DNS_SERVERS; do
  NXDOMAIN)
  PUBLIC_DISPLAY="NXDOMAIN"
  if [ "$REF_STATUS" = "NXDOMAIN" ]; then
- STATUS="✅ ОК (NXDOMAIN)"
+ STATUS="? ОК (NXDOMAIN)"
  elif [ -n "$ALL_TRUE" ] || [ "$REF_STATUS" = "NOERROR" ]; then
  if is_yandex_filtered "$SERVER_NAME"; then
- STATUS="🛡 Фильтрация Яндекса"
+ STATUS="?? Фильтрация Яндекса"
  else
- STATUS="🚨 ВОЗМОЖНАЯ ФИЛЬТРАЦИЯ (NXDOMAIN)"
+ STATUS="?? ВОЗМОЖНАЯ ФИЛЬТРАЦИЯ (NXDOMAIN)"
  fi
  else
- STATUS="⚠️ NXDOMAIN"
+ STATUS="?? NXDOMAIN"
  fi
 ;;
 
  SERVFAIL)
  PUBLIC_DISPLAY="SERVFAIL"
- STATUS="⚠️ SERVFAIL"
+ STATUS="?? SERVFAIL"
 ;;
 
  REFUSED)
  PUBLIC_DISPLAY="REFUSED"
- STATUS="⚠️ REFUSED"
+ STATUS="?? REFUSED"
 ;;
 
  FORMERR)
  PUBLIC_DISPLAY="FORMERR"
- STATUS="⚠️ FORMERR"
+ STATUS="?? FORMERR"
 ;;
 
  NOTIMP)
  PUBLIC_DISPLAY="NOTIMP"
- STATUS="⚠️ NOTIMP"
+ STATUS="?? NOTIMP"
 ;;
 
  *)
  [ -z "$PUBLIC_DISPLAY" ] && PUBLIC_DISPLAY="$DNS_STATUS"
- STATUS="⚠️ DNS status: $DNS_STATUS"
+ STATUS="?? DNS status: $DNS_STATUS"
 ;;
  esac
  fi
